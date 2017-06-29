@@ -38,6 +38,7 @@ module AMS
 
     class << self
       attr_accessor :_attributes, :_relations, :_id_field, :_type
+      attr_accessor :_fields, :_query_params
 
       # @api private
       # Macro to add an instance method to the receiver
@@ -77,6 +78,8 @@ module AMS
         base._attributes = _attributes.dup
         base._relations = _relations.dup
         base._type = _infer_type(base)
+        base._fields = _fields.dup
+        base._query_params = _query_params.dup
 
         add_class_method "def class; #{base}; end", base
         add_instance_method "def id; object.id; end", base
@@ -116,6 +119,7 @@ module AMS
       #     with options key: :hue
       def attribute(attribute_name, key: attribute_name)
         fail "ForbiddenKey" if attribute_name == :id
+        _fields << key
         _attributes[attribute_name] = { key: key }
         add_instance_method <<-METHOD
         def #{attribute_name}
@@ -139,6 +143,7 @@ module AMS
         else
           fail ArgumentError, "UnknownRelationship to='#{to}'"
         end
+        _fields << key
         _relations[relation_name] = { key: key, type: type, to: to }
       end
 
@@ -186,9 +191,34 @@ module AMS
           end
         METHOD
       end
+
+      # Configure allowed query parameters
+      #
+      # @example
+      #   query_params(:start_at, :end_at, filter: [:user_id])
+      def query_params(*args)
+        _query_params.concat args
+      end
+
+      # Add pagination query params
+      def paginated
+        _query_params << { page: [:number, :size] }
+      end
+
+      # @return allowed parameters for a single serializer
+      def show_params
+        [{ fields: _fields }]
+      end
+
+      # @return allowed parameters for a collection serializer
+      def index_params
+        show_params + _query_params
+      end
     end
     self._attributes = {}
     self._relations = {}
+    self._fields = []
+    self._query_params = []
 
     attr_reader :object
 
@@ -231,11 +261,11 @@ module AMS
     #
     # TODO: Support sparse fieldsets
     def attributes
-      fields = {}
+      hash = {}
       _attributes.each do |attribute_name, config|
-        fields[config[:key]] = send(attribute_name)
+        hash[config[:key]] = send(attribute_name)
       end
-      fields
+      hash
     end
 
     # Builds a Hash of specified relations
@@ -254,11 +284,11 @@ module AMS
     #
     # TODO: Support sparse fieldsets
     def relations
-      fields = {}
+      hash = {}
       _relations.each do |relation_name, config|
-        fields[config[:key]] = send(relation_name)
+        hash[config[:key]] = send(relation_name)
       end
-      fields
+      hash
     end
 
     # The configured type

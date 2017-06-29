@@ -166,15 +166,12 @@ module AMS
             related_#{relation_name}_ids.map { |id| relationship_data(id, "#{type}") }
           end
         METHOD
-        add_instance_method <<-METHOD, self
-          def related_#{relation_name}_links
-            related_link_to_many("#{type}")
-          end
-        METHOD
+        options[:relation_hash] ||= ""
         add_instance_method <<-METHOD, self
           def #{relation_name}
             {}.tap do |hash|
               hash[:data] = related_#{relation_name}_data
+              #{options[:relation_hash]}
             end
           end
         METHOD
@@ -207,15 +204,12 @@ module AMS
             relationship_data(related_#{relation_name}_id, "#{type}")
           end
         METHOD
-        add_instance_method <<-METHOD, self
-          def related_#{relation_name}_links
-            related_link_to_one(related_#{relation_name}_id, "#{type}")
-          end
-        METHOD
+        options[:relation_hash] ||= ""
         add_instance_method <<-METHOD, self
           def #{relation_name}
             {}.tap do |hash|
               hash[:data] = related_#{relation_name}_data
+              #{options[:relation_hash]}
             end
           end
         METHOD
@@ -250,6 +244,7 @@ module AMS
     self._query_params = []
 
     attr_reader :object
+    attr_writer :object # useful for re-using the serializer when serializing a collection
 
     # @param object [Object] the model whose data is used in serialization
     def initialize(object)
@@ -262,7 +257,7 @@ module AMS
       {
         id: id.to_s,
         type: type
-      }.merge({
+      }.merge!({
         attributes: attributes,
         relationships: relations
       }.reject { |_, v| v.empty? })
@@ -294,7 +289,7 @@ module AMS
     rescue NameError
       faster_method = String.new(%(def _fast_attributes\n hash={}\n))
       _attributes.each do |attribute_name, config|
-        faster_method << %(hash[:"#{config[:key]}"] = #{attribute_name} # if include?(attribute_name)\n)
+        faster_method << %(hash[:"#{config[:key]}"] = #{attribute_name}\n)
       end
       faster_method << "hash\nend"
       self.class.add_instance_method faster_method, self.class

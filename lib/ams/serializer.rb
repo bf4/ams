@@ -136,6 +136,9 @@ module AMS
       #   relation :articles, type: :articles, to: :many, key: :posts, ids: "object.article_ids"
       #   relation :article, type: :articles, to: :one, key: :post
       #   relation :article, type: :articles, to: :one, key: :post, id: "object.article_id"
+      #
+      #   #=> { data: { id: 1, type: :users} }
+      #   #=> { data: [ { id: 1, type: :users}, { id: 2, type: :users] } }
       def relation(relation_name, type:, to:, key: relation_name, **options)
         case to
         when :many then _relation_to_many(relation_name, type: type, key: key, **options)
@@ -154,17 +157,31 @@ module AMS
       #       object.article_ids
       #     end
       #
+      #     def related_articles_data
+      #       related_articles_ids.map {|id| relationship_data(id, :articles) }
+      #     end
+      #
       #     def articles
-      #       relationship_object(related_articles_ids, :articles)
+      #       {}.tap do |hash|
+      #         hash[:data] = related_articles_data
+      #       end
       #     end
       def _relation_to_many(relation_name, type:, ids:, key: relation_name, **options)
         add_instance_method <<-METHOD
           def related_#{relation_name}_ids
             #{ids}
           end
-
+        METHOD
+        add_instance_method <<-METHOD
+          def related_#{relation_name}_data
+            related_#{relation_name}_ids.map { |id| relationship_data(id, "#{type}") }
+          end
+        METHOD
+        add_instance_method <<-METHOD
           def #{relation_name}
-            relationship_object(related_#{relation_name}_ids, "#{type}")
+            {}.tap do |hash|
+              hash[:data] = related_#{relation_name}_data
+            end
           end
         METHOD
       end
@@ -176,18 +193,31 @@ module AMS
       #       object.article_id
       #     end
       #
+      #     def related_article_data
+      #       relationship_data(related_article_id, :articles)
+      #     end
+      #
       #     def article
-      #       relationship_object(related_article_id, :articles)
+      #       {}.tap do |hash|
+      #         hash[:data] = related_article_data
+      #       end
       #     end
       def _relation_to_one(relation_name, type:, id:, key: relation_name, **options)
         add_instance_method <<-METHOD
           def related_#{relation_name}_id
             #{id}
           end
-
+        METHOD
+        add_instance_method <<-METHOD
+          def related_#{relation_name}_data
+            relationship_data(related_#{relation_name}_id, "#{type}")
+          end
+        METHOD
+        add_instance_method <<-METHOD
           def #{relation_name}
-            id = related_#{relation_name}_id
-            relationship_object(id, "#{type}")
+            {}.tap do |hash|
+              hash[:data] = related_#{relation_name}_data
+            end
           end
         METHOD
       end
@@ -304,24 +334,6 @@ module AMS
     # The configured relations
     def _relations
       self.class._relations
-    end
-
-    # Builds a relationship object
-    #
-    # @example
-    #   relationship_object(1, :users)
-    #   #=> { data: { id: 1, type: :users} }
-    #
-    #   relationship_object([1,2], :users)
-    #   #=> { data: [ { id: 1, type: :users}, { id: 2, type: :users] } }
-    def relationship_object(id_or_ids, type)
-      data =
-        if id_or_ids.respond_to?(:to_ary)
-          id_or_ids.map { |id| relationship_data(id, type) }
-        else
-          relationship_data(id_or_ids, type)
-        end
-      { "data": data }
     end
 
     # resource linkage

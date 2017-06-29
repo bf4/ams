@@ -11,8 +11,14 @@ module AMS
       #       object.aritcles.pluck(:id)
       #     end
       #
+      #     def related_articles_data
+      #       related_articles_ids.map {|id| relationship_data(id, :articles) }
+      #     end
+      #
       #     def articles
-      #       relationship_object(related_articles_ids, :articles)
+      #       {}.tap do |hash|
+      #         hash[:data] = related_articles_data
+      #       end
       #     end
       #
       def _relation_to_many(relation_name, type:, key: relation_name, **options)
@@ -29,9 +35,16 @@ module AMS
       #       object.article.id
       #     end
       #
-      #     def article
-      #       relationship_object(related_article_id, :articles)
+      #     def related_article_data
+      #       relationship_data(related_article_id, :articles)
       #     end
+      #
+      #     def article
+      #       {}.tap do |hash|
+      #         hash[:data] = related_article_data
+      #       end
+      #     end
+      #
       def _relation_to_one(relation_name, type:, key: relation_name, **options)
         options.fetch(:id) do
           options[:id] = "object.#{relation_name}.id"

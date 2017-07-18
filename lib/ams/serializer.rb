@@ -133,26 +133,15 @@ module AMS
       #   relation :article, type: :articles, to: :one, key: :post
       #   relation :article, type: :articles, to: :one, key: :post, id: "object.article_id"
       def relation(relation_name, type:, to:, key: relation_name, **options)
-        _relations[relation_name] = { key: key, type: type, to: to }
         case to
         when :many then _relation_to_many(relation_name, type: type, key: key, **options)
         when :one then _relation_to_one(relation_name, type: type, key: key, **options)
         else
           fail ArgumentError, "UnknownRelationship to='#{to}'"
         end
+        _relations[relation_name] = { key: key, type: type, to: to }
       end
 
-      # @example
-      #   relation :articles, type: :articles, to: :many, key: :posts
-      #
-      #     def related_articles_ids
-      #       object.aritcles.pluck(:id)
-      #     end
-      #
-      #     def articles
-      #       relationship_object(related_articles_ids, :articles)
-      #     end
-      #
       # @example
       #   relation :articles, type: :articles, to: :many, key: :posts, ids: "object.article_ids"
       #
@@ -163,13 +152,10 @@ module AMS
       #     def articles
       #       relationship_object(related_articles_ids, :articles)
       #     end
-      def _relation_to_many(relation_name, type:, key: relation_name, **options)
-        ids_method = options.fetch(:ids) do
-          "object.#{relation_name}.pluck(:id)"
-        end
+      def _relation_to_many(relation_name, type:, ids:, key: relation_name, **options)
         add_instance_method <<-METHOD
           def related_#{relation_name}_ids
-            #{ids_method}
+            #{ids}
           end
 
           def #{relation_name}
@@ -178,17 +164,6 @@ module AMS
         METHOD
       end
 
-      # @example
-      #   relation :article, type: :articles, to: :one, key: :post
-      #
-      #     def related_article_id
-      #       object.article.id
-      #     end
-      #
-      #     def article
-      #       relationship_object(related_article_id, :articles)
-      #     end
-      #
       # @example
       #   relation :article, type: :articles, to: :one, key: :post, id: "object.article_id"
       #
@@ -199,13 +174,10 @@ module AMS
       #     def article
       #       relationship_object(related_article_id, :articles)
       #     end
-      def _relation_to_one(relation_name, type:, key: relation_name, **options)
-        id_method = options.fetch(:id) do
-          "object.#{relation_name}.id"
-        end
+      def _relation_to_one(relation_name, type:, id:, key: relation_name, **options)
         add_instance_method <<-METHOD
           def related_#{relation_name}_id
-            #{id_method}
+            #{id}
           end
 
           def #{relation_name}
